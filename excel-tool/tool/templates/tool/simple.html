@@ -1,0 +1,244 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Excel to CSV - Professional Tool</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        body { 
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc;
+        }
+        .pro-card {
+            background: white;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .spinner {
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top: 2px solid white;
+            width: 20px;
+            height: 20px;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-6">
+    <div class="pro-card rounded-xl p-10 max-w-xl w-full relative overflow-hidden">
+        <!-- Signature -->
+        <div class="absolute top-0 right-0 pt-4 pr-6">
+            <span class="text-[10px] font-bold uppercase tracking-widest text-slate-300">by ngtuonghy</span>
+        </div>
+
+        <div class="flex items-center gap-3 mb-2">
+            <i data-lucide="file-spreadsheet" class="w-8 h-8 text-indigo-600"></i>
+            <h1 class="text-2xl font-bold text-slate-900">Excel Processor</h1>
+        </div>
+        <p class="text-slate-500 mb-10 text-sm">Convert and clean Excel files to standardized CSV format.</p>
+        
+        <form id="upload-form" enctype="multipart/form-data" class="space-y-8">
+            {% csrf_token %}
+            
+            <!-- File Upload -->
+            <div class="space-y-2">
+                <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400">Excel Data Source</label>
+                <div id="drop-zone" class="border-2 border-dashed border-slate-200 rounded-xl p-8 text-center cursor-pointer hover:border-indigo-200 hover:bg-slate-50/50 transition-all group relative">
+                    <input 
+                        type="file" 
+                        name="file_path" 
+                        id="file-input"
+                        accept=".xls,.xlsx" 
+                        required
+                        class="absolute inset-0 opacity-0 cursor-pointer"
+                    >
+                    <div class="space-y-2 pointer-events-none">
+                        <i data-lucide="cloud-upload" class="mx-auto h-8 w-8 text-slate-300 group-hover:text-indigo-500 transition-colors"></i>
+                        <div class="flex flex-col">
+                            <span id="file-name-display" class="text-sm font-medium text-slate-600">Select Excel manifest</span>
+                            <span class="text-[11px] text-slate-400">Drag and drop or click to browse</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Skip Rows -->
+            <div class="space-y-2">
+                <label for="skip-rows" class="block text-xs font-semibold uppercase tracking-wider text-slate-400">
+                    Rows to Skip
+                </label>
+                <div class="relative">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                        <i data-lucide="list-minus" class="w-4 h-4"></i>
+                    </div>
+                    <input 
+                        type="number" 
+                        id="skip-rows" 
+                        name="skip_rows" 
+                        min="0" 
+                        max="100" 
+                        value="8"
+                        class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none transition-all text-sm"
+                        placeholder="8"
+                    >
+                </div>
+                <p class="text-[11px] text-slate-400 mt-1 italic">Number of header rows to ignore (e.g. 8 skips to row 9)</p>
+            </div>
+            
+            <!-- Submit Button -->
+            <button 
+                type="submit" 
+                id="submit-btn"
+                class="w-full bg-slate-900 text-white font-medium py-3 px-6 rounded-lg hover:bg-slate-800 transition-all flex items-center justify-center gap-2 shadow-sm"
+            >
+                <i data-lucide="upload-cloud" class="w-4 h-4"></i>
+                <span>Process Document</span>
+            </button>
+        </form>
+        
+        <!-- Status -->
+        <div id="status" class="mt-8 hidden"></div>
+        
+        <!-- Result -->
+        <div id="result" class="mt-8 hidden">
+            <div class="bg-indigo-50/50 border border-indigo-100 rounded-xl p-6">
+                <div class="flex items-center gap-2 text-indigo-900 font-semibold mb-4">
+                    <i data-lucide="check-circle-2" class="w-5 h-5 text-indigo-600"></i>
+                    <span>Processing Complete</span>
+                </div>
+                <div id="stats" class="grid grid-cols-2 gap-4 mb-6">
+                    <!-- Stats will be injected here -->
+                </div>
+                <button 
+                    id="download-btn"
+                    class="w-full bg-white border border-indigo-200 text-indigo-700 font-semibold py-2.5 px-4 rounded-lg hover:bg-indigo-50 transition-all flex items-center justify-center gap-2 shadow-sm"
+                >
+                    <i data-lucide="download" class="w-4 h-4"></i>
+                    Download Results
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize Lucide Icons
+        lucide.createIcons();
+
+        const form = document.getElementById('upload-form');
+        const fileInput = document.getElementById('file-input');
+        const fileNameDisplay = document.getElementById('file-name-display');
+        const dropZone = document.getElementById('drop-zone');
+        const skipRowsInput = document.getElementById('skip-rows');
+
+        // Load saved preference
+        const savedSkipRows = localStorage.getItem('excel_tool_skip_rows');
+        if (savedSkipRows !== null) {
+            skipRowsInput.value = savedSkipRows;
+        }
+
+        // Save preference on change
+        skipRowsInput.addEventListener('change', () => {
+            localStorage.setItem('excel_tool_skip_rows', skipRowsInput.value);
+        });
+
+        // Update file name display
+        fileInput.addEventListener('change', (e) => {
+            if (fileInput.files.length > 0) {
+                fileNameDisplay.textContent = fileInput.files[0].name;
+                fileNameDisplay.classList.add('text-indigo-600');
+                dropZone.classList.add('border-indigo-200', 'bg-indigo-50/30');
+            }
+        });
+
+        // Drag and drop feedback
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => dropZone.classList.add('border-indigo-400', 'bg-indigo-50/50'), false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => dropZone.classList.remove('border-indigo-400', 'bg-indigo-50/50'), false);
+        });
+
+        const submitBtn = document.getElementById('submit-btn');
+        const statusDiv = document.getElementById('status');
+        const resultDiv = document.getElementById('result');
+        const statsDiv = document.getElementById('stats');
+        const downloadBtn = document.getElementById('download-btn');
+        
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const formData = new FormData(form);
+            
+            // Show loading
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<div class="spinner mr-2"></div> Processing...';
+            
+            statusDiv.className = 'mt-8 bg-slate-100 border border-slate-200 rounded-lg p-4 flex items-center gap-3';
+            statusDiv.innerHTML = '<i data-lucide="refresh-cw" class="w-4 h-4 text-slate-500 animate-spin"></i> <p class="text-sm text-slate-600">Analyzing dataset...</p>';
+            lucide.createIcons(); // Re-init for injected HTML
+            
+            statusDiv.classList.remove('hidden');
+            resultDiv.classList.add('hidden');
+            
+            try {
+                const response = await fetch('{% url "tool:upload" %}', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    statusDiv.classList.add('hidden');
+                    resultDiv.classList.remove('hidden');
+                    
+                    const stats = data.stats;
+                    statsDiv.innerHTML = `
+                        <div class="bg-white p-3 rounded-lg border border-indigo-100/50">
+                            <span class="block text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Rows</span>
+                            <span class="text-lg font-bold text-slate-800">${stats.original_rows}</span>
+                        </div>
+                        <div class="bg-white p-3 rounded-lg border border-indigo-100/50">
+                            <span class="block text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Columns</span>
+                            <span class="text-lg font-bold text-slate-800">${stats.final_columns}</span>
+                        </div>
+                        <div class="bg-white p-3 rounded-lg border border-indigo-100/50">
+                            <span class="block text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Cleaned</span>
+                            <span class="text-lg font-bold text-slate-800">${stats.empty_columns_removed}</span>
+                        </div>
+                        <div class="bg-white p-3 rounded-lg border border-indigo-100/50">
+                            <span class="block text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Renamed</span>
+                            <span class="text-lg font-bold text-slate-800">${stats.unnamed_columns_renamed}</span>
+                        </div>
+                    `;
+                    
+                    downloadBtn.onclick = () => window.location.href = data.download_url;
+                    
+                } else {
+                    statusDiv.className = 'mt-8 bg-red-50 border border-red-100 rounded-lg p-4 flex items-center gap-3';
+                    statusDiv.innerHTML = `<i data-lucide="alert-circle" class="w-5 h-5 text-red-500"></i> <p class="text-sm text-red-700">${data.error}</p>`;
+                    lucide.createIcons();
+                }
+                
+            } catch (error) {
+                statusDiv.className = 'mt-8 bg-red-50 border border-red-100 rounded-lg p-4 flex items-center gap-3';
+                statusDiv.innerHTML = `<i data-lucide="alert-circle" class="w-5 h-5 text-red-500"></i> <p class="text-sm text-red-700">${error.message}</p>`;
+                lucide.createIcons();
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i data-lucide="upload-cloud" class="w-4 h-4 mr-2"></i> Process Document';
+                lucide.createIcons();
+            }
+        });
+    </script>
+</body>
+</html>
