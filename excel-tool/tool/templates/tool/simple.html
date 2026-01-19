@@ -126,6 +126,53 @@
                 </button>
             </div>
         </div>
+        
+        <!-- Sheet Selection (for multi-sheet files) -->
+        <div id="sheet-selection" class="mt-8 hidden">
+            <div class="bg-blue-50/50 border border-blue-100 rounded-xl p-6">
+                <div class="flex items-center gap-2 text-blue-900 font-semibold mb-4">
+                    <i data-lucide="layers" class="w-5 h-5 text-blue-600"></i>
+                    <span>Multiple Sheets Detected</span>
+                </div>
+                <p class="text-sm text-slate-600 mb-4">This Excel file contains multiple sheets. Choose how to proceed:</p>
+                
+                <!-- Sheet List -->
+                <div id="sheet-list" class="space-y-2 mb-6 max-h-60 overflow-y-auto">
+                    <!-- Checkboxes will be injected here -->
+                </div>
+                
+                <!-- Action Buttons -->
+                <div class="grid grid-cols-2 gap-3">
+                    <button 
+                        id="download-all-zip-btn"
+                        class="bg-blue-600 text-white font-semibold py-2.5 px-4 rounded-lg hover:bg-blue-700 transition-all flex items-center justify-center gap-2 shadow-sm"
+                    >
+                        <i data-lucide="package" class="w-4 h-4"></i>
+                        Download All (ZIP)
+                    </button>
+                    <button 
+                        id="download-selected-btn"
+                        class="bg-white border border-blue-200 text-blue-700 font-semibold py-2.5 px-4 rounded-lg hover:bg-blue-50 transition-all flex items-center justify-center gap-2 shadow-sm"
+                    >
+                        <i data-lucide="download" class="w-4 h-4"></i>
+                        Download Selected
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Multi-Sheet Results -->
+        <div id="multi-result" class="mt-8 hidden">
+            <div class="bg-green-50/50 border border-green-100 rounded-xl p-6">
+                <div class="flex items-center gap-2 text-green-900 font-semibold mb-4">
+                    <i data-lucide="check-circle-2" class="w-5 h-5 text-green-600"></i>
+                    <span id="multi-result-title">Processing Complete</span>
+                </div>
+                <div id="multi-result-content" class="space-y-3">
+                    <!-- Results will be injected here -->
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -173,6 +220,16 @@
         const statsDiv = document.getElementById('stats');
         const downloadBtn = document.getElementById('download-btn');
         
+        
+        // Multi-sheet handling variables
+        let currentFileData = null;
+        const sheetSelectionDiv = document.getElementById('sheet-selection');
+        const sheetListDiv = document.getElementById('sheet-list');
+        const multiResultDiv = document.getElementById('multi-result');
+        const multiResultContent = document.getElementById('multi-result-content');
+        const downloadAllZipBtn = document.getElementById('download-all-zip-btn');
+        const downloadSelectedBtn = document.getElementById('download-selected-btn');
+        
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
             
@@ -188,6 +245,8 @@
             
             statusDiv.classList.remove('hidden');
             resultDiv.classList.add('hidden');
+            sheetSelectionDiv.classList.add('hidden');
+            multiResultDiv.classList.add('hidden');
             
             try {
                 const response = await fetch('{% url "tool:upload" %}', {
@@ -199,29 +258,49 @@
                 
                 if (data.success) {
                     statusDiv.classList.add('hidden');
-                    resultDiv.classList.remove('hidden');
                     
-                    const stats = data.stats;
-                    statsDiv.innerHTML = `
-                        <div class="bg-white p-3 rounded-lg border border-indigo-100/50">
-                            <span class="block text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Rows</span>
-                            <span class="text-lg font-bold text-slate-800">${stats.original_rows}</span>
-                        </div>
-                        <div class="bg-white p-3 rounded-lg border border-indigo-100/50">
-                            <span class="block text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Columns</span>
-                            <span class="text-lg font-bold text-slate-800">${stats.final_columns}</span>
-                        </div>
-                        <div class="bg-white p-3 rounded-lg border border-indigo-100/50">
-                            <span class="block text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Cleaned</span>
-                            <span class="text-lg font-bold text-slate-800">${stats.empty_columns_removed}</span>
-                        </div>
-                        <div class="bg-white p-3 rounded-lg border border-indigo-100/50">
-                            <span class="block text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Renamed</span>
-                            <span class="text-lg font-bold text-slate-800">${stats.unnamed_columns_renamed}</span>
-                        </div>
-                    `;
-                    
-                    downloadBtn.onclick = () => window.location.href = data.download_url;
+                    // Check if single sheet or multiple sheets
+                    if (data.single_sheet) {
+                        // Single sheet - show result as before
+                        resultDiv.classList.remove('hidden');
+                        
+                        const stats = data.stats;
+                        statsDiv.innerHTML = `
+                            <div class="bg-white p-3 rounded-lg border border-indigo-100/50">
+                                <span class="block text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Rows</span>
+                                <span class="text-lg font-bold text-slate-800">${stats.original_rows}</span>
+                            </div>
+                            <div class="bg-white p-3 rounded-lg border border-indigo-100/50">
+                                <span class="block text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Columns</span>
+                                <span class="text-lg font-bold text-slate-800">${stats.final_columns}</span>
+                            </div>
+                            <div class="bg-white p-3 rounded-lg border border-indigo-100/50">
+                                <span class="block text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Cleaned</span>
+                                <span class="text-lg font-bold text-slate-800">${stats.empty_columns_removed}</span>
+                            </div>
+                            <div class="bg-white p-3 rounded-lg border border-indigo-100/50">
+                                <span class="block text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Renamed</span>
+                                <span class="text-lg font-bold text-slate-800">${stats.unnamed_columns_renamed}</span>
+                            </div>
+                        `;
+                        
+                        downloadBtn.onclick = () => window.location.href = data.download_url;
+                        
+                    } else if (data.multiple_sheets) {
+                        // Multiple sheets - show sheet selection
+                        currentFileData = data;
+                        sheetSelectionDiv.classList.remove('hidden');
+                        
+                        // Build sheet checkboxes
+                        sheetListDiv.innerHTML = data.sheets.map((sheet, index) => `
+                            <label class="flex items-center gap-3 p-3 bg-white border border-blue-100 rounded-lg hover:bg-blue-50/30 cursor-pointer transition-all">
+                                <input type="checkbox" value="${sheet}" class="sheet-checkbox w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500" ${index === 0 ? 'checked' : ''}>
+                                <span class="text-sm font-medium text-slate-700">${sheet}</span>
+                            </label>
+                        `).join('');
+                        
+                        lucide.createIcons();
+                    }
                     
                 } else {
                     statusDiv.className = 'mt-8 bg-red-50 border border-red-100 rounded-lg p-4 flex items-center gap-3';
@@ -239,6 +318,132 @@
                 lucide.createIcons();
             }
         });
+        
+        // Download all sheets as ZIP
+        downloadAllZipBtn.addEventListener('click', async () => {
+            if (!currentFileData) return;
+            
+            downloadAllZipBtn.disabled = true;
+            downloadAllZipBtn.innerHTML = '<div class="spinner mr-2"></div> Creating ZIP...';
+            
+            try {
+                const response = await fetch('{% url "tool:download_zip" %}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': '{{ csrf_token }}'
+                    },
+                    body: JSON.stringify({
+                        temp_file: currentFileData.temp_file,
+                        skip_rows: currentFileData.skip_rows,
+                        original_filename: currentFileData.original_filename
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    sheetSelectionDiv.classList.add('hidden');
+                    multiResultDiv.classList.remove('hidden');
+                    
+                    document.getElementById('multi-result-title').textContent = 'ZIP Created Successfully';
+                    multiResultContent.innerHTML = `
+                        <div class="bg-white p-4 rounded-lg border border-green-100">
+                            <p class="text-sm text-slate-600 mb-3">All ${data.sheets_processed} sheets have been processed and packaged.</p>
+                            <button onclick="window.location.href='${data.download_url}'" class="w-full bg-green-600 text-white font-semibold py-2.5 px-4 rounded-lg hover:bg-green-700 transition-all flex items-center justify-center gap-2">
+                                <i data-lucide="download" class="w-4 h-4"></i>
+                                Download ZIP (${data.filename})
+                            </button>
+                        </div>
+                    `;
+                    lucide.createIcons();
+                } else {
+                    alert('Error: ' + data.error);
+                }
+                
+            } catch (error) {
+                alert('Error: ' + error.message);
+            } finally {
+                downloadAllZipBtn.disabled = false;
+                downloadAllZipBtn.innerHTML = '<i data-lucide="package" class="w-4 h-4"></i> Download All (ZIP)';
+                lucide.createIcons();
+            }
+        });
+        
+        // Download selected sheets
+        downloadSelectedBtn.addEventListener('click', async () => {
+            if (!currentFileData) return;
+            
+            const checkboxes = document.querySelectorAll('.sheet-checkbox:checked');
+            const selectedSheets = Array.from(checkboxes).map(cb => cb.value);
+            
+            if (selectedSheets.length === 0) {
+                alert('Please select at least one sheet');
+                return;
+            }
+            
+            downloadSelectedBtn.disabled = true;
+            downloadSelectedBtn.innerHTML = '<div class="spinner mr-2"></div> Processing...';
+            
+            try {
+                const response = await fetch('{% url "tool:process_sheets" %}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': '{{ csrf_token }}'
+                    },
+                    body: JSON.stringify({
+                        temp_file: currentFileData.temp_file,
+                        selected_sheets: selectedSheets,
+                        skip_rows: currentFileData.skip_rows,
+                        original_filename: currentFileData.original_filename
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    sheetSelectionDiv.classList.add('hidden');
+                    multiResultDiv.classList.remove('hidden');
+                    
+                    document.getElementById('multi-result-title').textContent = `${data.results.length} Sheet(s) Processed`;
+                    multiResultContent.innerHTML = data.results.map(result => {
+                        if (result.error) {
+                            return `
+                                <div class="bg-red-50 p-4 rounded-lg border border-red-100">
+                                    <p class="text-sm font-medium text-red-700">${result.sheet_name}</p>
+                                    <p class="text-xs text-red-600 mt-1">Error: ${result.error}</p>
+                                </div>
+                            `;
+                        } else {
+                            return `
+                                <div class="bg-white p-4 rounded-lg border border-green-100">
+                                    <div class="flex items-center justify-between mb-2">
+                                        <p class="text-sm font-semibold text-slate-800">${result.sheet_name}</p>
+                                        <span class="text-xs text-slate-500">${result.stats.original_rows} rows</span>
+                                    </div>
+                                    <button onclick="window.location.href='${result.download_url}'" class="w-full bg-white border border-green-200 text-green-700 font-medium py-2 px-3 rounded-lg hover:bg-green-50 transition-all flex items-center justify-center gap-2 text-sm">
+                                        <i data-lucide="download" class="w-3 h-3"></i>
+                                        Download CSV
+                                    </button>
+                                </div>
+                            `;
+                        }
+                    }).join('');
+                    lucide.createIcons();
+                } else {
+                    alert('Error: ' + data.error);
+                }
+                
+            } catch (error) {
+                alert('Error: ' + error.message);
+            } finally {
+                downloadSelectedBtn.disabled = false;
+                downloadSelectedBtn.innerHTML = '<i data-lucide="download" class="w-4 h-4"></i> Download Selected';
+                lucide.createIcons();
+            }
+        });
     </script>
+
 </body>
 </html>
