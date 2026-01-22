@@ -14,72 +14,103 @@
 	export let onQuickDownload: (sheet: string) => void;
 </script>
 
-<Card>
-	<CardHeader>
+<Card class="bg-card/40 border-border/50 backdrop-blur-xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-right-8">
+	<CardHeader class="pb-4">
 		<div class="flex items-center justify-between">
-			<div>
-				<CardTitle>Multiple Sheets Detected</CardTitle>
-				<CardDescription>Select sheets to process</CardDescription>
+			<div class="flex items-center gap-3">
+				<div class="p-2 bg-primary/10 rounded-lg border border-primary/20">
+					<Package class="w-5 h-5 text-primary" />
+				</div>
+				<div>
+					<CardTitle class="text-xl font-bold bg-gradient-to-r from-white to-foreground/70 bg-clip-text text-transparent">Multi-Sheet Stream</CardTitle>
+					<CardDescription class="text-muted-foreground">Select target sheets for extraction</CardDescription>
+				</div>
 			</div>
-			<Badge variant="secondary">{sheets.length} sheets</Badge>
+			<Badge variant="outline" class="bg-muted/50 border-border text-muted-foreground font-mono">
+				{sheets.length} CHANNELS
+			</Badge>
 		</div>
 	</CardHeader>
-	<CardContent class="space-y-4">
+	<CardContent class="space-y-6">
 		<!-- Sheet List -->
-		<div class="space-y-2 max-h-60 overflow-y-auto">
+		<div class="space-y-2 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
 			{#each sheets as sheet}
-				<div class="flex items-center gap-3 p-3 border rounded-lg hover:bg-accent transition-colors">
-					<label class="flex items-center gap-3 flex-1 cursor-pointer">
-						<input
-							type="checkbox"
-							checked={selectedSheets.includes(sheet)}
-							onchange={() => onToggleSheet(sheet)}
-							class="w-4 h-4"
-						/>
-						<span class="font-medium">{sheet}</span>
+				<div class="group flex items-center gap-3 p-4 bg-muted/40 border border-border/60 rounded-xl hover:border-primary/30 hover:bg-muted/60 transition-all duration-300">
+					<label class="flex items-center gap-4 flex-1 cursor-pointer">
+						<div class="relative flex items-center justify-center">
+							<input
+								type="checkbox"
+								checked={selectedSheets.includes(sheet)}
+								onchange={() => onToggleSheet(sheet)}
+								class="peer appearance-none w-5 h-5 border-2 border-border rounded-md checked:bg-primary checked:border-primary transition-all cursor-pointer"
+							/>
+							<div class="absolute text-background opacity-0 peer-checked:opacity-100 transition-opacity">
+								<svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 font-bold" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="4">
+									<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+								</svg>
+							</div>
+						</div>
+						<span class="font-medium text-muted-foreground group-hover:text-foreground transition-colors uppercase tracking-tight font-mono text-sm">{sheet}</span>
 					</label>
-					<button
+					<Button
+						variant="outline"
+						size="sm"
 						onclick={() => onQuickDownload(sheet)}
-						class="h-8 px-3 rounded-md border bg-background hover:bg-accent hover:text-accent-foreground shadow-sm font-medium text-xs inline-flex items-center justify-center gap-1 disabled:opacity-50 disabled:pointer-events-none transition-colors"
-						title="Download this sheet only"
+						class="h-9 px-4 rounded-lg bg-muted border-border hover:bg-primary hover:text-primary-foreground hover:border-primary shadow-sm font-bold text-[10px] uppercase tracking-widest inline-flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-50"
+						title="Quick Extract"
 					>
-						<Download class="w-3 h-3" />
+						<Download class="w-3.5 h-3.5" />
 						Quick
-					</button>
+					</Button>
 				</div>
 			{/each}
 		</div>
 
-		<Separator />
+		<div class="h-px bg-gradient-to-r from-transparent via-border to-transparent"></div>
 
 		<!-- Action Buttons -->
-		<div class="grid grid-cols-2 gap-3">
+		<div class="grid grid-cols-2 gap-4">
 			<Button
+				variant="outline"
 				onclick={onDownloadAll}
 				disabled={isProcessing}
-				variant="default"
-				size="lg"
+				class="h-14 rounded-xl bg-background border-border hover:border-muted-foreground/50 text-foreground font-bold text-sm flex items-center justify-center gap-3 transition-all active:scale-[0.98] disabled:opacity-30"
 			>
 				{#if isProcessing}
-					<Loader2 class="w-4 h-4 mr-2 animate-spin" />
+					<Loader2 class="w-5 h-5 animate-spin" />
 				{:else}
-					<Package class="w-4 h-4 mr-2" />
+					<Package class="w-5 h-5 text-muted-foreground" />
 				{/if}
-				Download All (ZIP)
+				EXTRACT ALL (ZIP)
 			</Button>
 			<Button
 				onclick={onDownloadSelected}
 				disabled={selectedSheets.length === 0 || isProcessing}
-				variant="secondary"
-				size="lg"
+				class="h-14 rounded-xl bg-primary text-primary-foreground font-bold text-sm flex items-center justify-center gap-3 transition-all active:scale-[0.98] disabled:opacity-30 hover:shadow-[0_0_20px_-5px_rgba(var(--primary),0.4)]"
 			>
 				{#if isProcessing}
-					<Loader2 class="w-4 h-4 mr-2 animate-spin" />
+					<Loader2 class="w-5 h-5 animate-spin text-primary-foreground" />
 				{:else}
-					<Download class="w-4 h-4 mr-2" />
+					<Download class="w-5 h-5" />
 				{/if}
-				Download Selected ({selectedSheets.length})
+				EXTRACT SELECTED ({selectedSheets.length})
 			</Button>
 		</div>
 	</CardContent>
 </Card>
+
+<style>
+	.custom-scrollbar::-webkit-scrollbar {
+		width: 4px;
+	}
+	.custom-scrollbar::-webkit-scrollbar-track {
+		background: transparent;
+	}
+	.custom-scrollbar::-webkit-scrollbar-thumb {
+		background: #1e293b;
+		border-radius: 10px;
+	}
+	.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+		background: #334155;
+	}
+</style>
